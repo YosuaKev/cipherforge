@@ -1,4 +1,4 @@
-# ⚿ CipherForge v3 — Encryption Laboratory
+# ⚿ CipherForge
 ### Theme: Neo-Brutalist / Bauhaus Industrial
 ### Architecture: Logic separated from UI
 
