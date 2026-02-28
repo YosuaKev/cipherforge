@@ -1,17 +1,15 @@
-// playfair.js
 /**
- * PLAYFAIR CIPHER — Pure Logic
- * Digraph substitution cipher using a 5×5 key matrix (J = I)
+ * PLAYFAIR CIPHER — Final Clean Version
+ * 5x5 Matrix (J merged into I)
  */
 
-/**
- * Build a 5×5 matrix (25 letters) from keyword.
- * J merged with I.
- */
+/* ===============================
+   MATRIX GENERATION
+=================================*/
 export function buildPlayfairMatrix(keyword) {
   const seen = new Set();
 
-  const source = ((keyword || "").toUpperCase() + "ABCDEFGHIKLMNOPQRSTUVWXYZ")
+  const source = (keyword.toUpperCase() + "ABCDEFGHIKLMNOPQRSTUVWXYZ")
     .replace(/J/g, "I")
     .replace(/[^A-Z]/g, "");
 
@@ -24,17 +22,12 @@ export function buildPlayfairMatrix(keyword) {
     }
   }
 
-  return matrix; // length = 25
+  return matrix; // 25 letters
 }
 
-/**
- * Prepare plaintext:
- * - Uppercase
- * - J → I
- * - Remove non-letters
- * - Insert X between double letters
- * - Pad odd length with X
- */
+/* ===============================
+   PREPARE PLAINTEXT
+=================================*/
 export function preparePlayfairPlaintext(text) {
   let t = (text || "")
     .toUpperCase()
@@ -48,16 +41,16 @@ export function preparePlayfairPlaintext(text) {
     const a = t[i];
     const b = t[i + 1];
 
-    result += a;
-
     if (!b) {
-      result += "X";
-      i += 1;
-    } else if (a === b) {
-      result += "X";
+      result += a + "X";
+      break;
+    }
+
+    if (a === b) {
+      result += a + "X";
       i += 1;
     } else {
-      result += b;
+      result += a + b;
       i += 2;
     }
   }
@@ -65,110 +58,137 @@ export function preparePlayfairPlaintext(text) {
   return result;
 }
 
-/**
- * Prepare ciphertext (NO filler insertion here!)
- */
-export function preparePlayfairCiphertext(text) {
+/* ===============================
+   PREPARE CIPHERTEXT
+=================================*/
+function prepareCiphertext(text) {
   return (text || "")
     .toUpperCase()
     .replace(/J/g, "I")
     .replace(/[^A-Z]/g, "");
 }
 
-/**
- * Get row and column of character in matrix
- */
+/* ===============================
+   POSITION HELPER
+=================================*/
 function getPosition(matrix, ch) {
   const index = matrix.indexOf(ch);
   return [Math.floor(index / 5), index % 5];
 }
 
-/**
- * Process one digraph (encrypt/decrypt)
- */
-function processDigraph(matrix, a, b, encrypt) {
+/* ===============================
+   DIGRAPH PROCESSOR
+=================================*/
+function processDigraph(matrix, a, b, encrypt = true) {
   const [ra, ca] = getPosition(matrix, a);
   const [rb, cb] = getPosition(matrix, b);
 
-  let ea, eb, rule;
-
   if (ra === rb) {
     // Same row
-    ea = matrix[ra * 5 + (encrypt ? (ca + 1) % 5 : (ca + 4) % 5)];
-    eb = matrix[rb * 5 + (encrypt ? (cb + 1) % 5 : (cb + 4) % 5)];
-    rule = "same-row";
-  } else if (ca === cb) {
-    // Same column
-    ea = matrix[(encrypt ? (ra + 1) % 5 : (ra + 4) % 5) * 5 + ca];
-    eb = matrix[(encrypt ? (rb + 1) % 5 : (rb + 4) % 5) * 5 + cb];
-    rule = "same-column";
-  } else {
-    // Rectangle rule
-    ea = matrix[ra * 5 + cb];
-    eb = matrix[rb * 5 + ca];
-    rule = "rectangle";
+    return [
+      matrix[ra * 5 + (encrypt ? (ca + 1) % 5 : (ca + 4) % 5)],
+      matrix[rb * 5 + (encrypt ? (cb + 1) % 5 : (cb + 4) % 5)]
+    ];
   }
 
-  return { ea, eb, rule };
+  if (ca === cb) {
+    // Same column
+    return [
+      matrix[(encrypt ? (ra + 1) % 5 : (ra + 4) % 5) * 5 + ca],
+      matrix[(encrypt ? (rb + 1) % 5 : (rb + 4) % 5) * 5 + cb]
+    ];
+  }
+
+  // Rectangle rule
+  return [
+    matrix[ra * 5 + cb],
+    matrix[rb * 5 + ca]
+  ];
 }
 
-/**
- * Encrypt Playfair
- */
+/* ===============================
+   CLEANUP (REMOVE FILLER X)
+=================================*/
+function cleanupDecrypted(text) {
+  let result = "";
+
+  for (let i = 0; i < text.length; i++) {
+    const prev = text[i - 1];
+    const cur = text[i];
+    const next = text[i + 1];
+
+    // Remove X between same letters (G X G → G G)
+    if (cur === "X" && prev && next && prev === next) continue;
+
+    result += cur;
+  }
+
+  // Remove trailing X padding
+  if (result.endsWith("X")) {
+    result = result.slice(0, -1);
+  }
+
+  return result;
+}
+
+/* ===============================
+   ENCRYPT
+=================================*/
 export function playfairEncrypt(plaintext, keyword) {
-  if (!keyword || !keyword.trim())
-    return { result: "", steps: [], preparedText: "", error: "A keyword is required." };
+  if (!keyword || !keyword.trim()) {
+    return { result: "", error: "Keyword is required." };
+  }
 
   const matrix = buildPlayfairMatrix(keyword);
   const prepared = preparePlayfairPlaintext(plaintext);
 
-  if (!prepared)
-    return { result: "", steps: [], preparedText: "", error: "Plaintext cannot be empty." };
-
   let result = "";
-  const steps = [];
 
   for (let i = 0; i < prepared.length; i += 2) {
-    const a = prepared[i];
-    const b = prepared[i + 1];
-
-    const { ea, eb, rule } = processDigraph(matrix, a, b, true);
-
+    const [ea, eb] = processDigraph(
+      matrix,
+      prepared[i],
+      prepared[i + 1],
+      true
+    );
     result += ea + eb;
-    steps.push(`[${a}${b}] → ${rule} → [${ea}${eb}]`);
   }
 
-  return { result, steps, preparedText: prepared, error: null };
+  return { result, preparedText: prepared, error: null };
 }
 
-/**
- * Decrypt Playfair
- */
+/* ===============================
+   DECRYPT
+=================================*/
 export function playfairDecrypt(ciphertext, keyword) {
-  if (!keyword || !keyword.trim())
-    return { result: "", steps: [], preparedText: "", error: "A keyword is required." };
-
-  const matrix = buildPlayfairMatrix(keyword);
-  const prepared = preparePlayfairCiphertext(ciphertext);
-
-  if (!prepared)
-    return { result: "", steps: [], preparedText: "", error: "Ciphertext cannot be empty." };
-
-  if (prepared.length % 2 !== 0)
-    return { result: "", steps: [], preparedText: prepared, error: "Ciphertext length must be even." };
-
-  let result = "";
-  const steps = [];
-
-  for (let i = 0; i < prepared.length; i += 2) {
-    const a = prepared[i];
-    const b = prepared[i + 1];
-
-    const { ea, eb, rule } = processDigraph(matrix, a, b, false);
-
-    result += ea + eb;
-    steps.push(`[${a}${b}] → ${rule} → [${ea}${eb}]`);
+  if (!keyword || !keyword.trim()) {
+    return { result: "", error: "Keyword is required." };
   }
 
-  return { result, steps, preparedText: prepared, error: null };
+  const matrix = buildPlayfairMatrix(keyword);
+  const prepared = prepareCiphertext(ciphertext);
+
+  if (prepared.length % 2 !== 0) {
+    return { result: "", error: "Ciphertext length must be even." };
+  }
+
+  let result = "";
+
+  for (let i = 0; i < prepared.length; i += 2) {
+    const [da, db] = processDigraph(
+      matrix,
+      prepared[i],
+      prepared[i + 1],
+      false
+    );
+    result += da + db;
+  }
+
+  const cleaned = cleanupDecrypted(result);
+
+  return {
+    result: cleaned,          // hasil final bersih
+    rawResult: result,        // hasil asli sebelum cleanup
+    error: null
+  };
 }

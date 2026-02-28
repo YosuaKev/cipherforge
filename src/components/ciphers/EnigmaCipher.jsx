@@ -55,7 +55,7 @@ export default function EnigmaCipher() {
 
   const handleProcess = () => {
     reset();
-    const r = enigmaProcess(text, ...rotors, ...pos, ref, pb);
+    const r = enigmaProcess(text, rotors[0], rotors[1], rotors[2], pos[0], pos[1], pos[2], "A", "A", "A", ref, pb);
     if (r.error) setError(r.error);
     else { setResult(r.result); setSteps(r.steps.slice(0, 40)); }
   };
